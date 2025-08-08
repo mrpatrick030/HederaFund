@@ -1,4 +1,4 @@
-##Swell testnet contracts
+##Hedera testnet contracts
 
 - **[LENDING](https://hashscan.io/testnet/contract/0.0.6532538)**: 0xbE29F9c7D35c97F8A088B6F1B92F14b57A09D31A
 
