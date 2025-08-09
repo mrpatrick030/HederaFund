@@ -141,7 +141,7 @@ After creating the loan, you will be automatically navigated to the Lending sect
 Lending on HederaFund is simpler than you might expect. Thanks to a smooth and intuitive user experience, users can easily carry out all lending activities. The platform features dedicated sections like "View All Loans", "Loans You Funded", and "Loans You Created" to help users effortlessly track their loan activities.
 Search and pagination functionalities further enhance the usability of this powerful lending dApp.
 To start lending, users can easily navigate and interact with the available action buttons provided within the dApp.
-* Fund loan: This button is the button a user clicks on to fund a loan created by a borrower. No user can fund his own loan. The loan amount is sent automatically to the borrower.
+* Fund loan: This button is the button a potential lender clicks on to fund a loan created by a borrower. No user can fund his own loan. The loan amount is sent automatically to the borrower.
 * Claim collateral: The claim collateral button is typically available for the lender to use in case a borrower fails to repay a loan during the specified duration in the loan. You can only claim collateral of a loan you funded.
 * Repay loan: This button is available to only the borrower of a loan such that before the end of the loan duration, the borrower uses it to repay the borrowed amount with interest.
 * Withdraw collateral: In the event that there is no lender of a loan you created as a borrower, you can use this button to withdraw your collateral back. You can use this button only when your loan has not been funded.
