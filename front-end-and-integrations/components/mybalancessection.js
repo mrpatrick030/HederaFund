@@ -78,7 +78,7 @@ import {
             </div>
             <div className="text-center m-[0.4cm]" style={{display:"inline-block"}}>
                 <div className="font-[500] text-[110%]">HBAR Balance</div>
-                {userHBARbalance > 0 ? (<div className="text-[#aaa]">{parseFloat(userHBARbalance).toFixed(10)} HBAR</div>) : (<span>0</span>)}
+                {userHBARbalance > 0 ? (<div className="text-[#aaa]">{parseFloat(userHBARbalance).toFixed(8)} HBAR</div>) : (<span>0</span>)}
             </div>
             <div className="text-center m-[0.4cm]" style={{display:"inline-block"}}>
                 <div className="font-[500] text-[110%]">Loans you Created</div>

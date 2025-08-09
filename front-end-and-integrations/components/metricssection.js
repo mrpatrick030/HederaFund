@@ -45,11 +45,11 @@ export default function MetricsSection() {
                 console.log(getNumberOfLoans.toString())
                 setnumberOfLoans(getNumberOfLoans.toString())
                 const getMaxLoanAmount = await lendBorrowContractReadSettings.MAX_LOAN_AMOUNT()
-                console.log(getMaxLoanAmount.toString() * 10**-18)
-                setmaxLoanAmount(getMaxLoanAmount.toString() * 10**-18)
+                console.log(getMaxLoanAmount.toString() * 10**-8)
+                setmaxLoanAmount(getMaxLoanAmount.toString() * 10**-8)
                 const getMinLoanAmount = await lendBorrowContractReadSettings.MIN_LOAN_AMOUNT()
-                console.log(getMinLoanAmount.toString() * 10**-18)
-                setminLoanAmount(getMinLoanAmount.toString() * 10**-18)
+                console.log(getMinLoanAmount.toString() * 10**-8)
+                setminLoanAmount(getMinLoanAmount.toString() * 10**-8)
               } catch (error) {
                 console.log(error)
               }

@@ -344,6 +344,19 @@ const lendBorrowContractABI = [
         type: "uint256",
       },
     ],
+    name: "cancelLoan",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_loanId",
+        type: "uint256",
+      },
+    ],
     name: "claimCollateral",
     outputs: [],
     stateMutability: "nonpayable",
@@ -358,22 +371,43 @@ const lendBorrowContractABI = [
       },
       {
         internalType: "address",
-        name: "HDF",
+        name: "_hdf",
         type: "address",
       },
       {
         internalType: "address",
-        name: "usdt",
+        name: "_usdt",
         type: "address",
       },
       {
         internalType: "address",
-        name: "dai",
+        name: "_dai",
         type: "address",
       },
     ],
     stateMutability: "nonpayable",
     type: "constructor",
+  },
+  {
+    inputs: [],
+    name: "FailedCall",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "balance",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "needed",
+        type: "uint256",
+      },
+    ],
+    name: "InsufficientBalance",
+    type: "error",
   },
   {
     anonymous: false,
@@ -405,6 +439,25 @@ const lendBorrowContractABI = [
       },
     ],
     name: "CollateralClaimed",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "loanId",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "borrower",
+        type: "address",
+      },
+    ],
+    name: "CollateralWithdrawn",
     type: "event",
   },
   {
@@ -462,6 +515,25 @@ const lendBorrowContractABI = [
     outputs: [],
     stateMutability: "payable",
     type: "function",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "loanId",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "borrower",
+        type: "address",
+      },
+    ],
+    name: "LoanCancelled",
+    type: "event",
   },
   {
     anonymous: false,
@@ -615,7 +687,7 @@ const lendBorrowContractABI = [
         type: "address",
       },
     ],
-    name: "setadaoaddress",
+    name: "setDaoAddress",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -651,8 +723,34 @@ const lendBorrowContractABI = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "withdrawServiceCharges",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     stateMutability: "payable",
     type: "receive",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    name: "acceptedCollaterals",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
   },
   {
     inputs: [
@@ -662,31 +760,12 @@ const lendBorrowContractABI = [
         type: "uint256",
       },
     ],
-    name: "accepted_collaterals",
+    name: "acceptedCollateralsList",
     outputs: [
       {
         internalType: "address",
         name: "",
         type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    name: "accepteddCollaterals",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
       },
     ],
     stateMutability: "view",
@@ -727,6 +806,92 @@ const lendBorrowContractABI = [
   {
     inputs: [],
     name: "getAllLoans",
+    outputs: [
+      {
+        components: [
+          {
+            internalType: "uint256",
+            name: "loan_id",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "amount",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "interest",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "duration",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "repaymentAmount",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "fundingDeadline",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "collateralAmount",
+            type: "uint256",
+          },
+          {
+            internalType: "address",
+            name: "borrower",
+            type: "address",
+          },
+          {
+            internalType: "address payable",
+            name: "lender",
+            type: "address",
+          },
+          {
+            internalType: "address",
+            name: "collateral",
+            type: "address",
+          },
+          {
+            internalType: "bool",
+            name: "isCollateralErc20",
+            type: "bool",
+          },
+          {
+            internalType: "bool",
+            name: "active",
+            type: "bool",
+          },
+          {
+            internalType: "bool",
+            name: "repaid",
+            type: "bool",
+          },
+        ],
+        internalType: "struct P2PLending.Loan[]",
+        name: "",
+        type: "tuple[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_borrower",
+        type: "address",
+      },
+    ],
+    name: "getBorrowerLoans",
     outputs: [
       {
         components: [
@@ -885,6 +1050,38 @@ const lendBorrowContractABI = [
         internalType: "struct P2PLending.Loan",
         name: "",
         type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_loanId",
+        type: "uint256",
+      },
+    ],
+    name: "getLoanStatus",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "HBAR_DECIMALS",
+    outputs: [
+      {
+        internalType: "uint8",
+        name: "",
+        type: "uint8",
       },
     ],
     stateMutability: "view",
@@ -1093,7 +1290,7 @@ const lendBorrowContractABI = [
     type: "function",
   },
 ];
-const lendBorrowContractAddress = "0xbE29F9c7D35c97F8A088B6F1B92F14b57A09D31A";
+const lendBorrowContractAddress = "0xEB6e7F2772ec04D6E9cac673fc399EAa9e8F40b6";
 
 // USDT contract settings
 const usdtContractABI = [
@@ -1795,9 +1992,38 @@ const swapContractABI = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_token1Id",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_token2Id",
+        type: "uint256",
+      },
+    ],
+    name: "removeLiquidity",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     stateMutability: "nonpayable",
     type: "constructor",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+    ],
+    name: "SafeERC20FailedOperation",
+    type: "error",
   },
   {
     anonymous: false,
@@ -1872,24 +2098,6 @@ const swapContractABI = [
     ],
     name: "LiquidityRemoved",
     type: "event",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_token1Id",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_token2Id",
-        type: "uint256",
-      },
-    ],
-    name: "removeLiquidity",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
   },
   {
     inputs: [
@@ -2115,19 +2323,6 @@ const swapContractABI = [
   },
   {
     inputs: [],
-    name: "SLIPPAGE_TOLERANCE",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
     name: "tokenCount",
     outputs: [
       {
@@ -2201,7 +2396,7 @@ const swapContractABI = [
     type: "function",
   },
 ];
-const swapContractAddress = "0xBeB3494eA291cde3342855C15680BBF683b65fE1";
+const swapContractAddress = "0xA85C486c0e57267c954064Fd500077BDEdFa6704";
 
 module.exports = {
   tokenContractAddress,

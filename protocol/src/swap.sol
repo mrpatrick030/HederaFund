@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface IERC20 {
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-    function allowance(address owner, address spender) external view returns (uint256);
-}
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Swapper {
+    using SafeERC20 for IERC20;
+
     address public owner;
     bool internal locked;
 
@@ -39,11 +37,10 @@ contract Swapper {
 
     // Prices are fixed-point scaled to 1e18 (18 decimals)
     mapping(uint256 => uint256) public tokenPrice;
-    uint256 public constant ETH_PRICE_USD = 255600000000000000;    // 0.2556 * 1e18
-    uint256 public constant USDT_PRICE_USD = 1e18;                 // 1 * 1e18
-    uint256 public constant DAI_PRICE_USD  = 1e18;                 // 1 * 1e18
-    uint256 public constant HDF_PRICE_ETH  = 132000000000000;      // 0.000132 * 1e18
-    uint256 public constant SLIPPAGE_TOLERANCE = 98;
+    uint256 public constant ETH_PRICE_USD = 255600000000000000; // 0.2556 * 1e18
+    uint256 public constant USDT_PRICE_USD = 1 * 1000000000000000000; // 1 * 1e18
+    uint256 public constant DAI_PRICE_USD = 1 * 1000000000000000000; // 1 * 1e18
+    uint256 public constant HDF_PRICE_ETH = 132000000000000; // 0.000132 * 1e18
 
     mapping(uint256 => Token) public tokens;
     uint256 public tokenCount;
@@ -68,7 +65,7 @@ contract Swapper {
         tokenPrice[2] = DAI_PRICE_USD;
 
         tokens[3] = Token(address(0xB4e344aC158186B66B0ab62F880dbf63B6AFdA04), 18, "HDF");
-        tokenPrice[3] = HDF_PRICE_ETH;
+        tokenPrice[3] = (HDF_PRICE_ETH * ETH_PRICE_USD) / 1000000000000000000;
 
         tokenCount = 4;
     }
@@ -99,32 +96,7 @@ contract Swapper {
         uint256 toPrice = tokenPrice[_toTokenId];
         require(fromPrice > 0 && toPrice > 0, "Invalid price data");
 
-        uint256 amountToReceive;
-
-        // from HDF (3) special handling (HDF priced in ETH)
-        if (_fromTokenId == 3) {
-            if (_toTokenId == 0) {
-                // HDF -> ETH
-                amountToReceive = (_amountToSwap * fromPrice) / 1e18;
-            } else {
-                // HDF -> USD token
-                uint256 ethValue = (_amountToSwap * fromPrice) / 1e18; // HDF -> ETH
-                amountToReceive = (ethValue * ETH_PRICE_USD) / toPrice;
-            }
-        } else if (_toTokenId == 3) {
-            // To HDF
-            if (_fromTokenId == 0) {
-                // ETH -> HDF
-                amountToReceive = (_amountToSwap * 1e18) / toPrice;
-            } else {
-                // USD token -> HDF
-                uint256 ethValue = (_amountToSwap * fromPrice) / ETH_PRICE_USD; // USD->ETH
-                amountToReceive = (ethValue * 1e18) / toPrice; // ETH->HDF
-            }
-        } else {
-            // USD token <-> USD token or ETH<->USD (both priced in USD)
-            amountToReceive = (_amountToSwap * fromPrice) / toPrice;
-        }
+        uint256 amountToReceive = (_amountToSwap * fromPrice) / toPrice;
 
         // Adjust for decimals difference between tokens
         return (amountToReceive * (10 ** _toDecimal)) / (10 ** _fromDecimal);
@@ -154,24 +126,20 @@ contract Swapper {
 
         uint256 amountToReceive = _calculateSwapAmount(_fromTokenId, _toTokenId, _amountToSwap, fromToken.decimal, toToken.decimal);
 
-        // Basic slippage protection
-        uint256 minAmountOut = (amountToReceive * SLIPPAGE_TOLERANCE) / 100;
-        require(amountToReceive >= minAmountOut, "Slippage too high");
-
         // Determine which side in the pool is the toToken
         uint256 toTokenBalance = (_toTokenId == pool.token1Id) ? pool.token1Balance : pool.token2Balance;
         require(toTokenBalance >= amountToReceive, "Insufficient liquidity");
 
-        require(IERC20(fromToken.tokenAddress).transferFrom(msg.sender, address(this), _amountToSwap), "From token transfer failed");
-        require(IERC20(toToken.tokenAddress).transfer(msg.sender, amountToReceive), "To token transfer failed");
+        IERC20(fromToken.tokenAddress).safeTransferFrom(msg.sender, address(this), _amountToSwap);
+        IERC20(toToken.tokenAddress).safeTransfer(msg.sender, amountToReceive);
 
-        // Update pool balances with normalized logic
+        // Update pool balances with optimized storage writes
         if (_fromTokenId == pool.token1Id) {
-            pool.token1Balance += _amountToSwap;
-            pool.token2Balance -= amountToReceive;
+            pool.token1Balance = pool.token1Balance + _amountToSwap;
+            pool.token2Balance = pool.token2Balance - amountToReceive;
         } else {
-            pool.token1Balance -= amountToReceive;
-            pool.token2Balance += _amountToSwap;
+            pool.token1Balance = pool.token1Balance - amountToReceive;
+            pool.token2Balance = pool.token2Balance + _amountToSwap;
         }
 
         emit SwapExecuted(msg.sender, _fromTokenId, _toTokenId, _amountToSwap, amountToReceive);
@@ -188,24 +156,23 @@ contract Swapper {
 
         uint256 amountToReceive = _calculateSwapAmount(0, _tokenId, msg.value, 18, token.decimal);
 
-        uint256 minAmountOut = (amountToReceive * SLIPPAGE_TOLERANCE) / 100;
-        require(amountToReceive >= minAmountOut, "Slippage too high");
-
-        require(IERC20(token.tokenAddress).balanceOf(address(this)) >= amountToReceive, "Insufficient liquidity");
-        require(IERC20(token.tokenAddress).transfer(msg.sender, amountToReceive), "Token transfer failed");
-
         // Update liquidity pool balances accordingly
         (uint256 token1Id, uint256 token2Id, , ) = _normalizePair(0, _tokenId, 0, 0);
         bytes32 pairId = keccak256(abi.encodePacked(token1Id, token2Id));
         require(poolExists[pairId], "Liquidity pool does not exist");
         LiquidityPool storage pool = pools[pairId];
 
+        uint256 toTokenBalance = (_tokenId == pool.token1Id) ? pool.token1Balance : pool.token2Balance;
+        require(toTokenBalance >= amountToReceive, "Insufficient liquidity");
+
+        IERC20(token.tokenAddress).safeTransfer(msg.sender, amountToReceive);
+
         if (0 == pool.token1Id) {
-            pool.token1Balance += msg.value;
-            pool.token2Balance -= amountToReceive;
+            pool.token1Balance = pool.token1Balance + msg.value;
+            pool.token2Balance = pool.token2Balance - amountToReceive;
         } else {
-            pool.token1Balance -= amountToReceive;
-            pool.token2Balance += msg.value;
+            pool.token1Balance = pool.token1Balance - amountToReceive;
+            pool.token2Balance = pool.token2Balance + msg.value;
         }
 
         emit SwapExecuted(msg.sender, 0, _tokenId, msg.value, amountToReceive);
@@ -224,25 +191,25 @@ contract Swapper {
 
         uint256 amountToReceive = _calculateSwapAmount(_tokenId, 0, _amountToSwap, token.decimal, 18);
 
-        uint256 minAmountOut = (amountToReceive * SLIPPAGE_TOLERANCE) / 100;
-        require(amountToReceive >= minAmountOut, "Slippage too high");
-        require(address(this).balance >= amountToReceive, "Insufficient ETH liquidity");
-
-        require(IERC20(token.tokenAddress).transferFrom(msg.sender, address(this), _amountToSwap), "Token transfer failed");
-        payable(msg.sender).transfer(amountToReceive);
-
         // Update liquidity pool balances accordingly
         (uint256 token1Id, uint256 token2Id, , ) = _normalizePair(_tokenId, 0, 0, 0);
         bytes32 pairId = keccak256(abi.encodePacked(token1Id, token2Id));
         require(poolExists[pairId], "Liquidity pool does not exist");
         LiquidityPool storage pool = pools[pairId];
 
+        uint256 toTokenBalance = (0 == pool.token1Id) ? pool.token1Balance : pool.token2Balance;
+        require(toTokenBalance >= amountToReceive, "Insufficient liquidity");
+
+        IERC20(token.tokenAddress).safeTransferFrom(msg.sender, address(this), _amountToSwap);
+        (bool success, ) = payable(msg.sender).call{value: amountToReceive}("");
+        require(success, "ETH transfer failed");
+
         if (_tokenId == pool.token1Id) {
-            pool.token1Balance += _amountToSwap;
-            pool.token2Balance -= amountToReceive;
+            pool.token1Balance = pool.token1Balance + _amountToSwap;
+            pool.token2Balance = pool.token2Balance - amountToReceive;
         } else {
-            pool.token1Balance -= amountToReceive;
-            pool.token2Balance += _amountToSwap;
+            pool.token1Balance = pool.token1Balance - amountToReceive;
+            pool.token2Balance = pool.token2Balance + _amountToSwap;
         }
 
         emit SwapExecuted(msg.sender, _tokenId, 0, _amountToSwap, amountToReceive);
@@ -256,7 +223,7 @@ contract Swapper {
         uint256 _token2Id,
         uint256 _token1Amount,
         uint256 _token2Amount
-    ) external payable {
+    ) external payable onlyOwner {
         require(_token1Id < tokenCount && _token2Id < tokenCount, "Invalid token ID");
         require(_token1Id != _token2Id, "Cannot create pool with same token");
         require(_token1Amount > 0 && _token2Amount > 0, "Invalid amount");
@@ -277,10 +244,10 @@ contract Swapper {
 
         // Transfer tokens if not ETH
         if (token1Id != 0) {
-            require(IERC20(tokens[token1Id].tokenAddress).transferFrom(msg.sender, address(this), amount1), "Token1 transfer failed");
+            IERC20(tokens[token1Id].tokenAddress).safeTransferFrom(msg.sender, address(this), amount1);
         }
         if (token2Id != 0) {
-            require(IERC20(tokens[token2Id].tokenAddress).transferFrom(msg.sender, address(this), amount2), "Token2 transfer failed");
+            IERC20(tokens[token2Id].tokenAddress).safeTransferFrom(msg.sender, address(this), amount2);
         }
 
         if (!poolExists[pairId]) {
@@ -289,14 +256,14 @@ contract Swapper {
             poolExists[pairId] = true;
         }
 
-        pool.token1Balance += amount1;
-        pool.token2Balance += amount2;
+        pool.token1Balance = pool.token1Balance + amount1;
+        pool.token2Balance = pool.token2Balance + amount2;
 
         emit LiquidityAdded(msg.sender, token1Id, token2Id, amount1, amount2);
     }
 
     // Remove all liquidity for pair
-    function removeLiquidity(uint256 _token1Id, uint256 _token2Id) external nonReentrant {
+    function removeLiquidity(uint256 _token1Id, uint256 _token2Id) external nonReentrant onlyOwner {
         require(_token1Id < tokenCount && _token2Id < tokenCount, "Invalid token ID");
 
         // Normalize tokens
@@ -312,15 +279,17 @@ contract Swapper {
         require(token1Amount > 0 && token2Amount > 0, "No liquidity to remove");
 
         if (token1Id != 0) {
-            require(IERC20(tokens[token1Id].tokenAddress).transfer(msg.sender, token1Amount), "Token1 transfer failed");
+            IERC20(tokens[token1Id].tokenAddress).safeTransfer(msg.sender, token1Amount);
         } else {
-            payable(msg.sender).transfer(token1Amount);
+            (bool success, ) = payable(msg.sender).call{value: token1Amount}("");
+            require(success, "ETH transfer failed");
         }
 
         if (token2Id != 0) {
-            require(IERC20(tokens[token2Id].tokenAddress).transfer(msg.sender, token2Amount), "Token2 transfer failed");
+            IERC20(tokens[token2Id].tokenAddress).safeTransfer(msg.sender, token2Amount);
         } else {
-            payable(msg.sender).transfer(token2Amount);
+            (bool success, ) = payable(msg.sender).call{value: token2Amount}("");
+            require(success, "ETH transfer failed");
         }
 
         pool.token1Balance = 0;

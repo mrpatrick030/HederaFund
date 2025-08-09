@@ -109,9 +109,10 @@ export default function BorrowSection({displayComponent, setDisplayComponent, ch
           const currentTimestamp = block.timestamp;
           console.log("Current block timestamp:", currentTimestamp);
           const totalDuration = duration.toString() * 3600;
-          const fundingDeadline = duration.toString() * 3600
+          const fundingDeadline = block.timestamp + totalDuration
           console.log(totalDuration)
-          const createloan = await lendBorrowContractWriteSettings.createLoan(parseUnits(HBARamountToBorrow, 18), interestRate, totalDuration, parseUnits(collateralAmount, 18), collateralAddress, isERC20, fundingDeadline)
+          console.log(HBARamountToBorrow)
+          const createloan = await lendBorrowContractWriteSettings.createLoan(parseUnits(HBARamountToBorrow, 8), interestRate, totalDuration, parseUnits(collateralAmount, 18), collateralAddress, isERC20, fundingDeadline)
           setHideApprove(false)
           setDisplayComponent("lend")
           changeBg3()

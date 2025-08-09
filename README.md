@@ -215,8 +215,8 @@ Liquidity providers in the HederaFund Swap will be rewarded with incentives. Use
 
 ### P2P Lending/Borrowing Contract
 
-✅ [P2PLending](https://hashscan.io/testnet/contract/0.0.6532538) 🟢
-- Address: `0xbE29F9c7D35c97F8A088B6F1B92F14b57A09D31A`
+✅ [P2PLending](https://hashscan.io/testnet/contract/0.0.6537847) 🟢
+- Address: `0xEB6e7F2772ec04D6E9cac673fc399EAa9e8F40b6`
 
 ### HederaFund ERC20 (HDF) Contract
 
@@ -225,8 +225,8 @@ Liquidity providers in the HederaFund Swap will be rewarded with incentives. Use
 
 ### Swap Contract
 
-✅ [Swap](https://hashscan.io/testnet/contract/0.0.6532350) 🟢
-- Address: `0xBeB3494eA291cde3342855C15680BBF683b65fE1`
+✅ [Swap](https://hashscan.io/testnet/contract/0.0.6538307) 🟢
+- Address: `0xA85C486c0e57267c954064Fd500077BDEdFa6704`
 
 ## Other Tokens
 
@@ -241,4 +241,308 @@ Liquidity providers in the HederaFund Swap will be rewarded with incentives. Use
 
 
 
+
+# P2PLending Smart Contract Technical Documentation
+
+## Overview
+
+The `P2PLending` smart contract facilitates **peer-to-peer lending** using:
+- **HBAR** (native Hedera currency)  
+- **ERC20 tokens**  as collateral
+- **ERC721 NFTs** as collateral  
+
+It supports:
+- Loan creation, funding, repayment  
+- Collateral claiming on default  
+- Loan cancellation/withdrawal  
+- Service charge collection by the contract owner  
+
+Security features include:
+- `ReentrancyGuard` to prevent re-entrancy attacks  
+- Strict access control via modifiers  
+- Collateral whitelist  
+
+---
+
+## Constructor
+
+### Initialization
+
+Initializes the contract by setting:
+- **Owner address**
+- **Accepted collateral tokens** (HDF, USDT, DAI)
+
+```solidity
+constructor(address _initialOwner, address _hdf, address _usdt, address _dai) {
+    require(_initialOwner != address(0), "Invalid owner address");
+    _owner = _initialOwner;
+    _addCollateral(_hdf);
+    _addCollateral(_usdt);
+    _addCollateral(_dai);
+}
+```
+
+**Logic:**
+- Validates non-zero owner address  
+- Sets `_owner`  
+- Adds initial accepted collaterals to whitelist  
+
+---
+
+## Data Structures
+
+### Loan Struct
+
+```solidity
+struct Loan {
+    uint loan_id;
+    uint amount;
+    uint interest;
+    uint duration;
+    uint repaymentAmount;
+    uint fundingDeadline;
+    uint collateralAmount;
+    address borrower;
+    address payable lender;
+    address collateral;
+    bool isCollateralErc20;
+    bool active;
+    bool repaid;
+}
+```
+
+**Fields:**
+- `loan_id`: Unique identifier  
+- `amount`: Loan amount in tinybars or token units  
+- `interest`: Interest rate percentage  
+- `duration`: Expiration timestamp  
+- `repaymentAmount`: Principal + interest  
+- `fundingDeadline`: Deadline for loan funding  
+- `collateralAmount`: ERC20 amount or ERC721 token ID  
+- `borrower`: Address of borrower  
+- `lender`: Address of lender (payable)  
+- `collateral`: Token/NFT contract address  
+- `isCollateralErc20`: True for ERC20 collateral  
+- `active`: Loan status flag  
+- `repaid`: Repayment flag  
+
+### Mappings
+
+- `loans`: Maps loan ID → Loan struct  
+- `defaulters`: Tracks number of defaults per borrower  
+- `outstanding`: Tracks if borrower has an active loan  
+- `acceptedCollaterals`: Whitelist of allowed collateral addresses  
+- `acceptedCollateralsList`: Array of accepted collateral addresses  
+
+---
+
+## Modifiers
+
+- **`onlyOwner`** – Restricts function access to contract owner  
+- **`onlyActiveLoan(uint)`** – Ensures loan is still active  
+- **`isCollateral(address)`** – Ensures collateral is whitelisted  
+- **`onlyDao(address)`** – Restricts DAO-only functions  
+- **`onlyBorrower(uint)`** – Restricts access to the borrower of a loan  
+
+---
+
+## Functions
+
+### owner
+Returns the current owner address.
+
+```solidity
+function owner() public view returns (address)
+```
+
+### transferOwnership
+Transfers contract ownership.
+
+```solidity
+function transferOwnership(address newOwner) external onlyOwner
+```
+- Requires new owner is not zero address.  
+
+### setDaoAddress
+Sets the DAO address.
+
+```solidity
+function setDaoAddress(address _dao) external onlyOwner
+```
+- Requires non-zero DAO address.  
+
+### addCollateral
+Adds a new collateral token to the whitelist.
+
+```solidity
+function addCollateral(address _collateral) external onlyOwner
+```
+- Requires non-zero collateral address.  
+- Emits `CollateralAdded`.  
+
+### getAllLoans
+Returns all loans stored in the contract.
+
+```solidity
+function getAllLoans() external view returns (Loan[] memory)
+```
+
+### createLoan
+Creates a new loan request.
+
+```solidity
+function createLoan(
+    uint _amount,
+    uint _interest,
+    uint _duration,
+    uint _collateralAmount,
+    address _collateral,
+    bool _isERC20,
+    uint _fundingDeadline
+) external payable
+```
+
+**Key Points:**
+- Validates amount, interest, duration, funding deadline.  
+- HBAR loans require correct `msg.value`.  
+- ERC20 loans must send no HBAR.  
+- Collateral is transferred to the contract.  
+- Emits `LoanCreated`.  
+
+### fundLoan
+Funds an active loan.
+
+```solidity
+function fundLoan(uint _loanId) external payable
+```
+
+- Cannot be borrower.  
+- Must be before funding deadline.  
+- Transfers funds to borrower.  
+- Emits `LoanFunded`.  
+
+### repayLoan
+Repays an active loan.
+
+```solidity
+function repayLoan(uint _loanId) external payable
+```
+
+- Only borrower can repay.  
+- Calculates and deducts service fee.  
+- Sends repayment (minus fee) to lender.  
+- Returns collateral to borrower.  
+- Emits `LoanRepaid` and `ServiceFeeDeducted`.  
+
+### getLoanInfo
+Returns a single loan’s details.
+
+```solidity
+function getLoanInfo(uint _loanId) external view
+```
+
+### claimCollateral
+Claims collateral when borrower defaults.
+
+```solidity
+function claimCollateral(uint _loanId) external
+```
+
+- Only lender can claim.  
+- Loan must be overdue and unpaid.  
+- Transfers collateral to lender.  
+- Emits `CollateralClaimed`.  
+
+### withdrawFunds
+Withdraws collateral for unfunded loans.
+
+```solidity
+function withdrawFunds(uint _loanId) external
+```
+
+- Only borrower can call.  
+- Loan must not be funded.  
+- Returns collateral to borrower.  
+- Emits `CollateralWithdrawn`.  
+
+### withdrawServiceCharges
+Owner withdraws accumulated service charges.
+
+```solidity
+function withdrawServiceCharges() external onlyOwner
+```
+- Resets `totalServiceCharges` to zero.  
+- Emits `ServiceChargesWithdrawn`.  
+
+### cancelLoan
+Cancels a pending loan request.
+
+```solidity
+function cancelLoan(uint _loanId) external
+```
+
+- Only borrower can call.  
+- Loan must be unfunded and within deadline.  
+- Returns collateral to borrower.  
+- Emits `LoanCancelled`.  
+
+### getLoanStatus
+Returns human-readable loan status.
+
+```solidity
+function getLoanStatus(uint _loanId) external view returns (string memory)
+```
+
+Possible values:  
+- `"Repaid"`  
+- `"Cancelled or Withdrawn"`  
+- `"Inactive"`  
+- `"Defaulted"`  
+- `"Funded"`  
+- `"Expired"`  
+- `"Pending"`  
+
+### getBorrowerLoans
+Fetches all loans for a given borrower.
+
+```solidity
+function getBorrowerLoans(address _borrower) external view returns (Loan[] memory)
+```
+
+---
+
+## Loan Lifecycle Flow
+
+1. **Borrower Creates Loan** (`createLoan`)  
+   - Specifies amount, interest, collateral, deadline  
+   - Transfers collateral to contract  
+
+2. **Lender Funds Loan** (`fundLoan`)  
+   - Sends funds to borrower  
+
+3. **Borrower Repays Loan** (`repayLoan`)  
+   - Sends repayment to lender (minus service fee)  
+   - Collateral returned to borrower  
+
+4. **Default Handling** (`claimCollateral`)  
+   - If loan expires unpaid, lender claims collateral  
+
+5. **Cancellation / Withdrawal**  
+   - Borrower cancels loan (`cancelLoan`) or withdraws collateral if unfunded (`withdrawFunds`)  
+
+---
+
+## receive & fallback
+
+The contract includes:
+- `receive()` – Accepts direct HBAR transfers  
+- `fallback()` – Handles unexpected calls  
+
+
+## Security Considerations
+- **Reentrancy Protection:** `nonReentrant` modifier prevents reentrancy attacks.
+- **Slippage Tolerance:** Ensures users receive at least 98% of the expected amount.
+- **Chainlink Oracles:** Provides reliable price feeds (though token prices are used in this version).
+- **Ownable:** Restricts token addition to the contract owner.
+- **Liquidity Checks:** Prevents swaps with insufficient liquidity.
 
