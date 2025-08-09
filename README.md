@@ -116,7 +116,7 @@ This is the core functional area of HederaFund, bringing together the platformâ€
 This section of the dashboard shows all the balances of a user after logging in. It displays the following info for a user: HDF balance, HDF price, HBAR balance, number of loans you created, number of loans you funded.
 
 ### Metrics
-![File](https://supposed-emerald-snake.myfilebase.com/ipfs/QmbMouw1PZSYqApPDHucXXqsz79c3KU7guNHjRugHQDevG)
+![File](https://supposed-emerald-snake.myfilebase.com/ipfs/QmfZqd3Cg3iTwV3FdGcvePyKYQ1m57vDxv8QxjFgssfspm)
 The metrics section shows live updates to HederaFund including the following: HDF Total Supply, HDF Price, Protocol Blockchain, Total number of Loans, Max Loan Amount, Min Loan Amount, contract addresses of all contracts used by the protocol and Live HBAR market chart.
 
 
@@ -209,7 +209,7 @@ Liquidity providers in the HederaFund Swap will be rewarded with incentives. Use
 
 
 ## Contract Addresses with Hedera Testnet Links [Hedera Testnet Explorer](https://hashscan.io/testnet)
-![File](https://supposed-emerald-snake.myfilebase.com/ipfs/QmRHxHsBf3vf3DCftT3ErUuyiafksVZbm9beNKWdPY8BjR)
+![File](https://supposed-emerald-snake.myfilebase.com/ipfs/QmYExWXprdiRAak87ruUzovb5V21zVDGsQ9WfCARDve2ET)
 
 **All contracts are verified on the Hedera testnet explorer.**
 
